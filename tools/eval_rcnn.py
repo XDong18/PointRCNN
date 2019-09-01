@@ -178,6 +178,10 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
         rpn_scores_raw = rpn_cls[:, :, 0]
         rpn_scores = torch.sigmoid(rpn_scores_raw)
         seg_result = (rpn_scores > cfg.RPN.SCORE_THRESH).long()
+        
+        # seg_gt_used=============
+        if args.seg_gt_used:
+            seg_result = rpn_cls_label
 
         # proposal layer
         rois, roi_scores_raw = model.rpn.proposal_layer(rpn_scores_raw, rpn_reg, backbone_xyz)  # (B, M, 7)
