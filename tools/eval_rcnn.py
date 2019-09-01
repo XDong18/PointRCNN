@@ -1,3 +1,7 @@
+'''
+In this file, rpn segmentation result are calculated and saved
+'''
+
 import _init_path
 import os
 import numpy as np
@@ -28,6 +32,9 @@ np.random.seed(1024)  # set the same seed
 parser = argparse.ArgumentParser(description="arg parser")
 parser.add_argument('--cfg_file', type=str, default='cfgs/default.yml', help='specify the config for evaluation')
 parser.add_argument("--eval_mode", type=str, default='rpn', required=True, help="specify the evaluation mode")
+
+#seg_gt_used
+parser.add_argument("--seg_gt_used", type=int, default=0, help="whether to use the goundturth seg to generate the output of rpn")
 
 parser.add_argument('--eval_all', action='store_true', default=False, help='whether to evaluate all checkpoints')
 parser.add_argument('--test', action='store_true', default=False, help='evaluate without ground truth')
@@ -113,6 +120,10 @@ def save_rpn_features(seg_result, rpn_scores_raw, pts_features, backbone_xyz, ba
 def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
     np.random.seed(1024)
     mode = 'TEST' if args.test else 'EVAL'
+    
+    # seg_gt_used========================
+    if args.seg_gt_used:
+        os.path.join(reatult_dir, 'seg_gt_used')
 
     if args.save_rpn_feature:
         kitti_features_dir = os.path.join(result_dir, 'features')
@@ -159,6 +170,10 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
         rpn_cls, rpn_reg = ret_dict['rpn_cls'], ret_dict['rpn_reg']
         backbone_xyz, backbone_features = ret_dict['backbone_xyz'], ret_dict['backbone_features']
 
+        '''
+        this part is rpn_seg information============================================================================
+        '''
+        
         rpn_scores_raw = rpn_cls[:, :, 0]
         rpn_scores = torch.sigmoid(rpn_scores_raw)
         seg_result = (rpn_scores > cfg.RPN.SCORE_THRESH).long()
@@ -202,7 +217,7 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
                 rpn_iou_avg += rpn_iou.item()
 
             # save result
-            if args.save_rpn_feature:
+            if args.save_rpn_feature and not args.seg_gt_used:
                 # save features to file
                 save_rpn_features(seg_result[bs_idx].float().cpu().numpy(),
                                   rpn_scores_raw[bs_idx].float().cpu().numpy(),
@@ -210,9 +225,38 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
                                   backbone_xyz[bs_idx].cpu().numpy(),
                                   backbone_features[bs_idx].cpu().numpy().transpose(1, 0),
                                   kitti_features_dir, cur_sample_id)
+            
+            # if seg_gt_used========================
+            if args.save_rpn_feature and args.seg_gt_used:
+                # save features to file
+                save_rpn_features(rpn_cls_label[bs_idx].float().cpu().numpy(),
+                                  rpn_scores_raw[bs_idx].float().cpu().numpy(),
+                                  pts_features[bs_idx],
+                                  backbone_xyz[bs_idx].cpu().numpy(),
+                                  backbone_features[bs_idx].cpu().numpy().transpose(1, 0),
+                                  kitti_features_dir, cur_sample_id)
 
-            if args.save_result or args.save_rpn_feature:
+            if (args.save_result or args.save_rpn_feature) and not args.seg_gt_used:
                 cur_pred_cls = cur_seg_result.cpu().numpy()
+                output_file = os.path.join(seg_output_dir, '%06d.npy' % cur_sample_id)
+                if not args.test:
+                    cur_gt_cls = cur_rpn_cls_label.cpu().numpy()
+                    output_data = np.concatenate(
+                        (cur_pts_rect.reshape(-1, 3), cur_gt_cls.reshape(-1, 1), cur_pred_cls.reshape(-1, 1)), axis=1)
+                else:
+                    output_data = np.concatenate((cur_pts_rect.reshape(-1, 3), cur_pred_cls.reshape(-1, 1)), axis=1)
+
+                np.save(output_file, output_data.astype(np.float16))
+
+                # save as kitti format
+                calib = dataset.get_calib(cur_sample_id)
+                cur_boxes3d = cur_boxes3d.cpu().numpy()
+                image_shape = dataset.get_image_shape(cur_sample_id)
+                save_kitti_format(cur_sample_id, calib, cur_boxes3d, kitti_output_dir, cur_scores_raw, image_shape)
+                
+            #if seg_gt_used===============
+            if (args.save_result or args.save_rpn_feature) and args.seg_gt_used:
+                cur_pred_cls = cur_rpn_cls_label.cpu().numpy()
                 output_file = os.path.join(seg_output_dir, '%06d.npy' % cur_sample_id)
                 if not args.test:
                     cur_gt_cls = cur_rpn_cls_label.cpu().numpy()
