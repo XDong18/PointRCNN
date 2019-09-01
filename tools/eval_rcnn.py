@@ -123,7 +123,7 @@ def eval_one_epoch_rpn(model, dataloader, epoch_id, result_dir, logger):
     
     # seg_gt_used========================
     if args.seg_gt_used:
-        os.path.join(result_dir, 'seg_gt_used')
+        result_dir = os.path.join(result_dir, 'seg_gt_used')
 
     if args.save_rpn_feature:
         kitti_features_dir = os.path.join(result_dir, 'features')
