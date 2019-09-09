@@ -20,7 +20,9 @@ def get_calib_from_file(calib_file):
             'R0': R0.reshape(3, 3),
             'Tr_velo2cam': Tr_velo_to_cam.reshape(3, 4)}
 
-
+class NuCalibration(object):
+    def __init__(self, calib_file):
+        
 class Calibration(object):
     def __init__(self, calib_file):
         if isinstance(calib_file, str):
