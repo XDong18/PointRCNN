@@ -1,3 +1,5 @@
+## 目前认为本类没有作用
+
 import torch
 import torch.nn as nn
 from pointnet2_lib.pointnet2.pointnet2_modules import PointnetFPModule, PointnetSAModuleMSG
